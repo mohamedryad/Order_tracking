@@ -1575,26 +1575,31 @@ if not st.session_state.mes_commandes.empty:
     st.markdown("---")
     st.markdown("### 💰 Bilan financier")
 
-    colA, colB, colC, colD = st.columns(4)
+    colA, colB, colC, colD, colE = st.columns(5)
 
     colA.metric(
         label="Total des ventes",
         value=f"{total_ventes_dz:,.0f} DZ".replace(",", " ")
     )
+    
 
     colB.metric(
         label="Total des frais",
         value=f"{frais_dz:,.0f} DZ".replace(",", " ")
     )
-
     colC.metric(
+            label="Total des frais en Euros",
+            value=f"{cout_achat_total:,.0f} €".replace(",", " ")
+        )
+
+    colD.metric(
         label="Bénéfice net estimé",
         value=f"{benefice_net_dz:,.0f} DZ".replace(",", " "),
         delta="Bénéfice" if benefice_net_dz >= 0 else "Perte",
         delta_color="normal" if benefice_net_dz >= 0 else "inverse"
     )
 
-    colD.metric(
+    colE.metric(
         label="Bénéfice net en euros",
         value=f"{benefice_net_euros:,.2f} €".replace(",", " ")
     )
