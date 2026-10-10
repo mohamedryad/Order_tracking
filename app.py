@@ -1539,26 +1539,22 @@ if not st.session_state.mes_commandes.empty:
     # MARGE
     # ========================================================
 
-    st.markdown("---")
+    TAUX_CHANGE = 250  # 1 € = 250 DZ
 
+    # Total des ventes facturées aux clients
     total_ventes_dz = (
-        df_valide[
-            "Prix de vente"
-        ].sum()
+        df_valide["Prix de vente"].fillna(0).sum()
     )
 
+    # Coût des comptes et des achats Marketplace
     cout_achat_comptes = (
-        comptes_calculs[
-            "Coût d'achat"
-        ].sum()
+        comptes_calculs["Coût d'achat"].fillna(0).sum()
     )
 
     total_achats_marketplace = (
         df_valide[
-            df_valide["Vendeur"]
-            == "Marketplace"
-        ]["Prix"]
-        .sum()
+            df_valide["Vendeur"] == "Marketplace"
+        ]["Prix"].fillna(0).sum()
     )
 
     cout_achat_total = (
@@ -1566,48 +1562,41 @@ if not st.session_state.mes_commandes.empty:
         + total_achats_marketplace
     )
 
-    marge = (
-        total_ventes_dz / 250
-    ) - cout_achat_total
+    # Conversion des frais en DZ
+    frais_dz = cout_achat_total * TAUX_CHANGE
 
-    colA, colB, colC = (
-        st.columns(3)
-    )
+    # Bénéfice net estimé en DZ
+    benefice_net_dz = total_ventes_dz - frais_dz
+
+    # Bénéfice net estimé en euros
+    benefice_net_euros = benefice_net_dz / TAUX_CHANGE
+
+    # Affichage des indicateurs
+    st.markdown("---")
+    st.markdown("### 💰 Bilan financier")
+
+    colA, colB, colC, colD = st.columns(4)
 
     colA.metric(
-
-        label="Total des Ventes (DZ)",
-
-        value=(
-            f"{total_ventes_dz:,.0f} DZ"
-            .replace(",", " ")
-        )
+        label="Total des ventes",
+        value=f"{total_ventes_dz:,.0f} DZ".replace(",", " ")
     )
 
     colB.metric(
-
-        label="Coût d'achat total (€)",
-
-        value=f"{cout_achat_total:.2f} €",
-
-        help=(
-            "Somme des coûts d'achat "
-            "des comptes + montant total "
-            "des achats Marketplace"
-        )
+        label="Total des frais",
+        value=f"{frais_dz:,.0f} DZ".replace(",", " ")
     )
 
     colC.metric(
+        label="Bénéfice net estimé",
+        value=f"{benefice_net_dz:,.0f} DZ".replace(",", " "),
+        delta="Bénéfice" if benefice_net_dz >= 0 else "Perte",
+        delta_color="normal" if benefice_net_dz >= 0 else "inverse"
+    )
 
-        label="Marge Estimée (€)",
-
-        value=f"{marge:.2f} €",
-
-        help=(
-            "Calcul : "
-            "(Total Ventes DZ / 250) "
-            "- Coût d'achat total"
-        )
+    colD.metric(
+        label="Bénéfice net en euros",
+        value=f"{benefice_net_euros:,.2f} €".replace(",", " ")
     )
 
 else:
