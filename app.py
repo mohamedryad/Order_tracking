@@ -293,7 +293,7 @@ if st.button("🔄 Recharger les données depuis Supabase"):
 # ============================================================
 
 st.markdown("### 💳 Gestion des Comptes")
-st.caption("Ajoutez vos différents comptes ici. Ces informations serviront à déduire les achats et calculer la marge.")
+st.caption("Ajoutez vos différents comptes ici. Ces informations serviront à déduire les achats et calculer le solde.")
 
 edited_comptes = st.data_editor(
     st.session_state.comptes[["_id", "Nom du compte", "Montant initial (€)", "Coût d'achat"]],
@@ -483,31 +483,62 @@ if not st.session_state.mes_commandes.empty:
     st.divider()
 
     # ========================================================
+    # 💰 ÉTAT ET SOLDE DES COMPTES DE PAIEMENT
+    # ========================================================
+
+    st.markdown("### 💰 État & Solde des Comptes de Paiement")
+    st.caption("Calcule le montant dépensé sur chaque compte (via les prix d'achat) et déduit le solde restant.")
+
+    if not edited_comptes.empty:
+        # Calculer les dépenses totales par compte en additionnant les prix d'achat des commandes associées
+        df_commandes_valides = edited_df[edited_df["Statut"] != "🚫 Colis refusé"].copy()
+        df_commandes_valides["Prix_Achat_Num"] = pd.to_numeric(df_commandes_valides["Prix"], errors="coerce").fillna(0.0)
+
+        depenses_par_compte = df_commandes_valides.groupby("Compte")["Prix_Achat_Num"].sum().reset_index()
+        depenses_par_compte.rename(columns={"Compte": "Nom du compte", "Prix_Achat_Num": "Total Dépensé (€)"}, inplace=True)
+
+        # Fusionner avec la table des comptes
+        suivi_comptes = pd.merge(edited_comptes, depenses_par_compte, on="Nom du compte", how="left")
+        suivi_comptes["Total Dépensé (€)"] = suivi_comptes["Total Dépensé (€)"].fillna(0.0)
+        suivi_comptes["Montant initial (€)"] = pd.to_numeric(suivi_comptes["Montant initial (€)"], errors="coerce").fillna(0.0)
+
+        # Calcul du solde restant
+        suivi_comptes["Solde Restant (€)"] = suivi_comptes["Montant initial (€)"] - suivi_comptes["Total Dépensé (€)"]
+
+        st.dataframe(
+            suivi_comptes[["Nom du compte", "Montant initial (€)", "Total Dépensé (€)", "Solde Restant (€)"]],
+            column_config={
+                "Nom du compte": st.column_config.TextColumn("Compte"),
+                "Montant initial (€)": st.column_config.NumberColumn("Montant initial", format="%.2f €"),
+                "Total Dépensé (€)": st.column_config.NumberColumn("Total Dépensé", format="%.2f €"),
+                "Solde Restant (€)": st.column_config.NumberColumn("Solde Restant", format="%.2f €")
+            },
+            hide_index=True,
+            width="stretch"
+        )
+
+    st.divider()
+
+    # ========================================================
     # 📊 BÉNÉFICES & BILAN FINANCIER (LIVRÉS UNIQUEMENT)
     # ========================================================
 
     st.markdown("### 📊 Bilan Financier (Commandes Livrées Uniquement)")
     st.caption("Ce calcul prend en compte **exclusivement** les articles avec le statut **✅ Livré**.")
 
-    # Filtrer uniquement les articles livrés
     df_livres = edited_df[edited_df["Statut"] == "✅ Livré"].copy()
 
     if not df_livres.empty:
-        # Nettoyage et conversion numérique sécurisée
         df_livres["Prix_Achat_Num"] = pd.to_numeric(df_livres["Prix"], errors="coerce").fillna(0.0)
         df_livres["Prix_Vente_Num"] = pd.to_numeric(df_livres["Prix de vente"], errors="coerce").fillna(0.0)
 
-        # Totaux
         total_articles_livres = len(df_livres)
         cout_achat_total_eur = df_livres["Prix_Achat_Num"].sum()
         chiffre_affaires_dz = df_livres["Prix_Vente_Num"].sum()
 
-        # Hypothèse de calcul du bénéfice en DZ :
-        # Conversion du coût d'achat au taux moyen implicite de la formule (1 € ~ 320 DZ)
         cout_achat_total_dz = cout_achat_total_eur * 320
         benefice_total_dz = chiffre_affaires_dz - cout_achat_total_dz
 
-        # Affichage des métriques financières
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("📦 Articles Livrés", f"{total_articles_livres} art.")
         m2.metric("💶 Coût d'achat total", f"{cout_achat_total_eur:.2f} €")
@@ -527,7 +558,6 @@ if not st.session_state.mes_commandes.empty:
     st.caption("Affiche les totaux et bénéfices par client sur les articles livrés uniquement.")
 
     if not df_livres.empty:
-        # Calcul du bénéfice par ligne
         df_livres["Benefice_Ligne_DZ"] = df_livres["Prix_Vente_Num"] - (df_livres["Prix_Achat_Num"] * 320)
 
         bilan_client = (
